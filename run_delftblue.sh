@@ -103,7 +103,7 @@ printf "${font_progress} $ts LAMMPS was successfully built $ts ${nocolor} \n"
 
 # Re-run simulations
 cd $repopath
-for simdir in lj
+for simdir in lj water-methanol
 do
     # Delete preexisting directories if they exist
     if [ -d $simdir-rerun ]; then
