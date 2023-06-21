@@ -1,0 +1,141 @@
+## For quicktest OCTP 2.0 (copied and adjusted from an SI of Sayeds paper)
+boundary p p p
+units lj
+atom_style molecular 
+
+#################### VARIABLES ####################
+variable COEF equal (1)                             # A multiplier for the number of particles
+variable mol1 equal (250*${COEF})                   # number of particle 1
+variable mol2 equal (500*${COEF}-${mol1})           # number of particle 2
+
+variable s11 equal 1.0                              # sigma 11
+variable s22 equal 1.2                              # sigma 22
+variable s12 equal (${s11}+${s22})/2.0              # sigma 12 (arithmetic mixing)
+variable mas1 equal 1.0                             # mass of particle 1 
+variable mas2 equal (${mas1}*(${s22}/${s11})^3)     # mass of particle 2
+variable e11 equal 1.0                              # epsilon 11
+variable e22 equal 0.8                              # epsilon 22
+variable e12 equal sqrt(${e11}*${e22})*(1.0-(-0.3)) # epsilon 12 (modified Lorentz-Berthelot)
+variable rcut equal 4.0                             # cutoff radius
+variable skin equal 0.5                             # verlet list parameters
+variable checkbin equal 2                           # verlet list parameters
+
+variable temp equal 0.65                            # reduced external temperature (T*)
+variable volum equal 790.0560*${COEF}               # The volume size (from Equilibrium)
+variable box equal (${volum}^(1.0/3.0))             # The side of the simulation box
+variable Etotal equal -5.13404                      # Total energy of system per atom
+variable dt equal 0.001                             # timestep (t*)
+variable Nf equal 50000                             # frequency of sampling
+variable nininvt equal 20000                        # initializing in NVT (2 damping rates)
+variable nsamnvt equal 100000                       # sampling energy in NVT 
+variable nrun equal 1000000                         # production in NVE
+
+variable nb equal 10                                # Number of blocks (fix ordern)
+variable nbe equal 20                               # Number of block elements (fix ordern)
+variable Nvisc equal 5                              # Nevery for viscosity (fix ordern: sample data at (Nvisc*2))
+variable Ncond equal 5                              # Nevery for Tconductivity (fix ordern: sample data at (Ncond*2))
+variable Ndiff equal 1000                           # Nevery for diffusivity (fix ordern: sample data at (Ndiff))
+variable Nwrit equal 100000                         # Nwrite for transport properties (fix ordern: write every (Nwrit))
+
+variable random_V equal 2234                        # the random seed to initialize velocities
+variable random_m1 equal 223                        # the random seed to create LJ species 1
+variable random_m2 equal 235                        # the random seed to create LJ species 2
+
+thermo ${Nf}
+
+#################### FORCE FIELDS ####################
+region region1 block 0 ${box} 0 ${box} 0 ${box}
+create_box 2 region1   
+mass 1 ${mas1}        
+mass 2 ${mas2}        
+create_atoms 1 random ${mol1} ${random_m1} NULL 
+create_atoms 2 random ${mol2} ${random_m2} NULL 
+pair_style lj/cut ${rcut}                            # cutoff radius (sigma) 
+pair_modify mix arithmetic shift yes                 # shifted wo/ analytic tail correction
+pair_coeff 1 1 ${e11} ${s11}        # pair 1-1: epsilon , sigma 
+pair_coeff 1 2 ${e12} ${s12}        # pair 1-2: epsilon , sigma 
+pair_coeff 2 2 ${e22} ${s22}        # pair 2-2: epsilon , sigma 
+
+#################### SETTINGS ####################
+group 1 type 1
+group 2 type 2            
+variable numgroup1 equal count(1)
+variable numgroup2 equal count(2)
+
+neighbor ${skin} bin
+neigh_modify every ${checkbin} delay 0 check yes
+
+timestep ${dt}
+reset_timestep 0
+run_style verlet
+
+min_style cg 
+minimize 1.0e-6 1.0e-6 10000 100000
+reset_timestep 0
+
+#################### 1) Initializing in NVT ensemble ####################
+velocity all create ${temp} ${random_V} 
+
+fix integrate all nvt temp ${temp} ${temp} 0.1
+run ${nininvt}
+
+unfix integrate
+fix integrate all nvt temp ${temp} ${temp} 1.0
+
+run ${nininvt}
+reset_timestep 0
+
+#################### 2) Equilibrating in NVT ensemble #####################
+
+# Temperature of last configuration
+variable T1 equal temp
+fix Tave1 all ave/time ${nsamnvt} 1 ${nsamnvt} v_T1
+
+# Kinetic energy of last configuration
+variable KE1 equal ke
+fix KEave1 all ave/time ${nsamnvt} 1 ${nsamnvt} v_KE1
+
+# Potential energy of last configuration
+variable PE1 equal pe
+fix PEave1 all ave/time ${nsamnvt} 1 ${nsamnvt} v_PE1
+
+run ${nsamnvt}
+
+# Rescale temperature to create NVE initial set NVE
+variable TempNew equal (f_Tave1*(${Etotal}-f_PEave1)/(f_KEave1))
+velocity all scale ${TempNew}
+
+variable TempNew delete
+variable T1 delete
+unfix Tave1
+variable KE1 delete
+unfix KEave1
+variable PE1 delete
+unfix PEave1
+unfix integrate
+
+reset_timestep 0
+
+#################### 3) Simulating in NVE ensmeble ######################
+#################### Here we sample the OCTP data ######################
+fix integrate all nve  # set to NVE
+
+# computing shear and bulk viscosities  using the OCTP plugin
+compute T all temp
+compute P all pressure T
+fix f1 all ordern viscosity ${Nvisc} ${Nwrit} c_P nb ${nb} nbe ${nbe} file viscosity.dat title "Testheader viscosity"
+
+compute KE all ke/atom
+compute PE all pe/atom
+compute ST all stress/atom NULL virial
+compute heatflux all heat/flux KE PE ST
+fix f2 all ordern thermalconductivity ${Ncond} ${Nwrit} c_heatflux nb ${nb} nbe ${nbe} file tconductivity.dat title "Testheader thermal conductivity"
+
+# do compute positions for diffusion and Onsager coefficients
+compute positions all position
+fix f3 all ordern diffusivity ${Ndiff} ${Nwrit} c_positions nb ${nb} nbe ${nbe} file diffself.dat diffonsag.dat title "Testheader diffusion and onsager coefficients"
+
+# and now we run it while sampling OCTP
+run ${nrun}
+
+quit
