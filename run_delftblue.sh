@@ -38,31 +38,36 @@ font_regular='\033[0m'      # no color
 
 
 # download lammps release
-printf "${font_progress}Downloading LAMMPS\n"
-git clone https://github.com/lammps/lammps.git
+if [ ! -d lammps ]; then
+    printf "${font_progress} $ts Downloading LAMMPS $ts ${nocolor} \n"
+    git clone https://github.com/lammps/lammps.git
+else
+    printf "${font_progress} $ts Using existing LAMMPS code $ts ${nocolor} \n"
+fi
 cd lammps
 git checkout stable_23Jun2022_update4
 cd src
 
 
 # download OCTP plugin files
-printf "${font_progress}Downloading OCTP plugin files\n"
-wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/compute_position.cpp
-wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/compute_position.h
-wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/compute_rdf_ext.cpp
-wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/compute_rdf_ext.h
-wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/fix_ordern.cpp
-wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/fix_ordern.h
+printf "${font_progress} $ts Downloading OCTP plugin files $ts ${nocolor} \n"
+for octpfile in compute_position.cpp compute_position.h compute_rdf_ext.cpp compute_rdf_ext.h fix_ordern.cpp fix_ordern.h
+do
+    # Delete file if it already exists
+    if [ -f $octpfile ]; then rm -f $octpfile; fi
+    # Download file
+    wget https://raw.githubusercontent.com/omoultosEthTuDelft/OCTP/0febdc2e32a3cfe1f27ec06e4ad9756ee861ba8a/$octpfile
+done
 
 
 # load DelftBlue modules needed to compile and run lammps
-printf "${font_progress}Loading 2022r2 and openmpi modules\n"
+printf "${font_progress} $ts Loading 2022r2 and openmpi modules $ts ${nocolor} \n"
 module load 2022r2
 module load openmpi
 
 
 # build lammps with the octp plugin
-printf "${font_progress}Building LAMMPS\n"
+printf "${font_progress} $ts Building LAMMPS $ts ${nocolor} \n"
 make yes-asphere
 make yes-body
 make yes-class2
@@ -73,19 +78,18 @@ make yes-manybody
 make yes-molecule
 make yes-rigid
 make yes-shock
-make mpi
+make serial
 
 
 # check if lammps compilation was successful; if not, exit script
-lammps_path=$(pwd)/lmp_mpi
+lammps_path=$(pwd)/lmp_serial
 if [ ! -f "$lammps_path" ]; then
-    printf "${font_error}Error building LAMMPS\nDeleting tmp files\n"
     cd $repopath
-    rm -rf lammps/
-   printf "${font_error}Aborting script\n" 
+    printf "${font_error} $ts Error building LAMMPS $ts ${nocolor} \n"
+    printf "${font_error} $ts Aborting script $ts ${nocolor} \n" 
     exit 1
 fi
-printf "${font_progress}LAMMPS was successfully built\n"
+printf "${font_progress} $ts LAMMPS was successfully built $ts ${nocolor} \n"
 
 
 # Re-run simulations
@@ -95,21 +99,24 @@ printf "${font_progress}LAMMPS was successfully built\n"
 #SBATCH -t 01:00:00             # max job time hh:mm:ss
 #SBATCH --mem-per-cpu=1G        # ram memory allocated per cpu
 
+# Re-run simulations
 cd $repopath
 for simdir in lj
 do
     # Delete preexisting directories if they exist
     if [ -d $simdir-rerun ]; then
-        printf "${font_progress}Deleting ${simdir}-rerun directory\n"
+        printf "${font_progress} $ts Deleting ${simdir}-rerun directory $ts ${nocolor} \n"
         rm -rf $simdir-rerun;
     fi
     # Create output directory and copy LAMMPS input files
     mkdir $simdir-rerun
     cp $simdir/input* $simdir-rerun
     # Run the simulation
-    printf "${font_progress}Running ${simdir}\n"
-    srun $lammps_path -in input_simulation.in
+    printf "${font_progress} $ts Running ${simdir} simulation $ts ${nocolor} \n"
+    cd $simdir-rerun
+    $lammps_path -in input_simulation.in
 done
+
 
 wait
 exit 0
