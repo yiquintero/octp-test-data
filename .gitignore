@@ -1,0 +1,5 @@
+# Ignore lammps directory
+lammps/
+
+# Ignore rerun simulation directories
+*-rerun/
