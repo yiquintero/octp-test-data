@@ -1,15 +1,20 @@
 #!/bin/bash
+#SBATCH --job-name="octp-test"  
+#SBATCH -n 8                    # number of cpu cores
+#SBATCH -t 01:00:00             # max job time hh:mm:ss
+#SBATCH --mem-per-cpu=1G        # ram memory allocated per cpu
+
 # ----------------------------- DESCRIPTION -----------------------------
 #
 # This script runs the LAMMPS simulations included in this repository.
 # It performs the following tasks:
 #
-#	1. Loads the necessary Delft Blue modules needed to compile and run LAMMPS.
+#   1. Loads the necessary Delft Blue modules needed to compile and run LAMMPS.
 #   2. Downloads the version of OCTP and LAMMPS with which the simulations
 #       were originally ran
-#	3. Compiles LAMMPS with the OCTP plugin (OpenMPI support)
-#	4. Runs the simulations using the srun command
-#	
+#   3. Compiles LAMMPS with the OCTP plugin (OpenMPI support)
+#   4. Runs the simulations using the srun command
+#   
 # Input:
 #
 #   None
@@ -43,6 +48,10 @@ if [ ! -d lammps ]; then
     git clone https://github.com/lammps/lammps.git
 else
     printf "${font_progress} $ts Using existing LAMMPS code $ts ${nocolor} \n"
+    cd lammps/src
+    make clean-all
+    if [ -f lmp_mpi ]; then rm -f lmp_mpi; fi
+    cd ../../
 fi
 cd lammps
 git checkout stable_23Jun2022_update4
@@ -78,11 +87,11 @@ make yes-manybody
 make yes-molecule
 make yes-rigid
 make yes-shock
-make serial
+make -j8 mpi
 
 
 # check if lammps compilation was successful; if not, exit script
-lammps_path=$(pwd)/lmp_serial
+lammps_path=$(pwd)/lmp_mpi
 if [ ! -f "$lammps_path" ]; then
     cd $repopath
     printf "${font_error} $ts Error building LAMMPS $ts ${nocolor} \n"
@@ -91,13 +100,6 @@ if [ ! -f "$lammps_path" ]; then
 fi
 printf "${font_progress} $ts LAMMPS was successfully built $ts ${nocolor} \n"
 
-
-# Re-run simulations
-
-#SBATCH --job-name="octp-test"  
-#SBATCH -n 8                    # number of cpu cores
-#SBATCH -t 01:00:00             # max job time hh:mm:ss
-#SBATCH --mem-per-cpu=1G        # ram memory allocated per cpu
 
 # Re-run simulations
 cd $repopath
@@ -114,7 +116,7 @@ do
     # Run the simulation
     printf "${font_progress} $ts Running ${simdir} simulation $ts ${nocolor} \n"
     cd $simdir-rerun
-    $lammps_path -in input_simulation.in
+    srun $lammps_path -in input_simulation.in
 done
 
 

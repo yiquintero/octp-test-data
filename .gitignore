@@ -3,3 +3,6 @@ lammps/
 
 # Ignore rerun simulation directories
 *-rerun/
+
+# Ignore slurm output file
+slurm*.out
