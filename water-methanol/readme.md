@@ -1,2 +1,4 @@
+This example was taken from the [OCTP plugin repository](https://github.com/omoultosEthTuDelft/OCTP/tree/master/examples/Basic%20inputs). The input file was slightly modified to be compatible with the [LAMMPS June 2022 stable release](https://github.com/lammps/lammps/releases/tag/stable_23Jun2022_update4).
+
 In this simulation, transport properties of an equimolar mixture of water-methanol are computed at 298 K and 1 atm by using the commands provided by the OCTP plugin. The TraPPE united-atom force field is used for the methanol molecule combined with the SPC/E water model. These force field paramters are specified in the file "input_forcefield.data". The configuration of the system consisting of 250 water and 250 methanol molecules is provided in the file "input_data.system". The simulation procedure, which is the input to the LAMMPS executable file, is specified in the file "input_simulation.in".
 
