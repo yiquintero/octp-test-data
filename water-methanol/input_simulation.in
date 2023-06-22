@@ -110,7 +110,6 @@ variable Dens equal v_nMolecule*${mMolecule}/(vol*${A3_in_m3})
 fix DensAve all ave/time 1 ${NBR} ${NBR} v_Dens file density.dat
 
 run ${Npnpt}
-reset_timestep 0
 
 #################### 3) Initializing the NVT ensemble ####################
 # scaling the size of the system to the average volume
@@ -128,6 +127,8 @@ unfix VoluAve
 # changing the ensemble to NVT
 unfix integrate
 fix integrate all nvt temp ${Temp} ${Temp} 100.0
+
+reset_timestep 0
 
 # Initializing the whole system with very small timesteps in the NVT ensemble
 timestep 0.001
@@ -162,9 +163,10 @@ dump trjectory all xyz ${Nd} movie.xyz
 dump_modify trjectory element C H H O O          
 
 run ${Npnvt}
-reset_timestep 0
 
 undump trjectory
+
+
 
 #################### 3) Simulating in NVE ensmeble ######################
 # Scaling the temperature (kinetic energy) according to the average total energy
@@ -183,6 +185,7 @@ variable TempNew delete
 
 # changing the ensemble to NVE
 unfix integrate
+reset_timestep 0
 fix integrate all nve
 
 # computing average total energy, pontential energy, temperature, and pressure over time
