@@ -111,4 +111,5 @@ do
 	printf "${font_progress} $ts Running ${simdir} simulation $ts ${nocolor} \n"
 	cd $simdir-rerun
 	$lammps_path -in input_simulation.in
+	cd ..
 done

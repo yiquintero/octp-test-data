@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name="octp-test"  
-#SBATCH -n 8                    # number of cpu cores
-#SBATCH -t 01:00:00             # max job time hh:mm:ss
+#SBATCH -n 24                   # number of cpu cores
+#SBATCH -t 03:30:00             # max job time hh:mm:ss
 #SBATCH --mem-per-cpu=1G        # ram memory allocated per cpu
 
 # ----------------------------- DESCRIPTION -----------------------------
@@ -87,7 +87,7 @@ make yes-manybody
 make yes-molecule
 make yes-rigid
 make yes-shock
-make -j8 mpi
+make -j24 mpi
 
 
 # check if lammps compilation was successful; if not, exit script
@@ -117,6 +117,7 @@ do
     printf "${font_progress} $ts Running ${simdir} simulation $ts ${nocolor} \n"
     cd $simdir-rerun
     srun $lammps_path -in input_simulation.in
+    cd ..
 done
 
 
