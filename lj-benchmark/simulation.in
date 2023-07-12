@@ -12,17 +12,16 @@ atom_style full
 #################### VARIABLES ####################
 variable Temp equal 150       # Temperature in K
 
-
 variable RandomSeed equal 100 # The random seed for velocity
-variable tstep equal 1.0      # 1fs # value of timesteps in fseg - dont change 
+variable tstep equal 1.0      # 1fs 
 
-variable Ninvt equal 0   # Initialize the NVT ensemble - changed the value to zero since we dont care
-variable Nrun equal 1000    # Production in the NVT ensemble (energy) - number of time steps CHANGE HERE
+variable Ninvt equal 0          # Initialize the NVT ensemble
+variable Nrun equal 100000    # Production in the NVT ensemble (energy)
 
 variable Nf equal 10000       # Nfreq (fix ave/time and thermo)
 variable Ne equal  10         # Nevery (fix ave/time)
 variable Nr equal ${Nf}/${Ne} # Nrepeat (fix ave/time)
-variable Nd equal ${Nrun}/10 # Frequency of outputting positions of atoms in the NVT ensemble
+#variable Nd equal ${Nrun}/10 # Frequency of outputting positions of atoms in the NVT ensemble
 
 variable nb equal 10          # Number of blocks (fix ordern)
 variable nbe equal 20         # Number of block elements (fix ordern)
@@ -34,13 +33,14 @@ variable Nrdfe equal 100      # Nevery for RDF (fix ave/time)
 variable Nrdfw equal 1000     # Nwrite for RDF (compute rdf/ext: write every (Nrdfw*Nrdfe))
 variable binnum equal 2000    # Number of bins for RDF
 
+
+
 #################### ATOM DEFINITION and FORCEFIELD ####################
 read_data ./data.lmp                     # read the positions
 include ./forcefield.data                # read the force field
 
 
-replicate 8 8 8   #changes number of particles
-# 1 particle per box, we replicate the box 8 times in each dim, so we get 512 particles total
+replicate 8 8 8
 
 #################### INITIALIZATION ####################
 # groups
@@ -92,9 +92,15 @@ fix f3 all ordern diffusivity ${Ndiff} ${Nwrit} c_positions nb ${nb} nbe ${nbe} 
 fix f1 all ordern viscosity ${Nvisc} ${Nwrit} c_P nb ${nb} nbe ${nbe} file viscosity.dat
 
 # computing the RDF for all group pairs
-
 compute rdfs all rdf/ext Nbin ${binnum} Nwrite ${Nrdfw} file rdf.dat
 fix f4 all ave/time 1 1 ${Nrdfe} c_rdfs
+
+# computing thermal conductivity using the OCTP plugin
+compute KE all ke/atom
+compute PE all pe/atom
+compute ST all stress/atom NULL virial
+compute heatflux all heat/flux KE PE ST
+fix f2 all ordern thermalconductivity ${Nvisc} ${Nwrit} c_heatflux nb ${nb} nbe ${nbe} file tconductivity.dat 
 
 # Thermo style for outputing system properties to the log file
 thermo_style custom step temp f_TempAve press f_PressAve pe ke etotal
@@ -106,6 +112,6 @@ thermo_modify flush yes
 
 run ${Nrun}
 
-undump trjectory
+#undump trjectory
 quit
 
